@@ -28,7 +28,7 @@
 // @ is an alias to /src
 import EventCard from '@/components/EventCard.vue'
 import EventService from '../services/EventService'
-import {watchEffect} from 'vue';
+import Nprogress from 'nprogress';
 
 export default {
   name: 'EventList',
@@ -47,25 +47,43 @@ export default {
       this.$router.push('?limit='+event.target.value+'&page=' + this.page)
     }
   },
-  created() {
-    watchEffect(() => {
-      this.events = null;
-      EventService.getEvents(this.limit, this.page)
-            .then((response) => {
-              this.events = response.data;
-              this.totalEvents = response.headers['x-total-count'];
-            })
-            .catch((error) => {
-              this.$router.push({
-                name: 'networkError',
-              })
-              console.log(error)
-            })
-    })
+  beforeRouteEnter (routeTo, routeFrom, next) {
+    Nprogress.start();
+    EventService.getEvents(parseInt(routeTo.query.limit) || 2, parseInt(routeTo.query.page) || 1)
+      .then((response) => {
+        next(comp => {
+          comp.events = response.data;
+          comp.totalEvents = response.headers['x-total-count'];
+        })
+      })
+      .catch(() => {
+        next({
+          name: 'networkError',
+        })
+      })
+      .finally(() => {
+        Nprogress.done();
+      })
+  },
+  beforeRouteUpdate (routeTo) {
+    Nprogress.start();
+    EventService.getEvents(parseInt(routeTo.query.limit) || 2, parseInt(routeTo.query.page) || 1)
+      .then((response) => {
+        this.events = response.data;
+        this.totalEvents = response.headers['x-total-count'];
+      })
+      .catch(() => {
+        return {
+          name: 'networkError',
+        }
+      })
+      .finally(() => {
+        Nprogress.done();
+      })
   },
   computed: {
     hasNextPage() {
-      var totalPages = Math.ceil(this.totalEvents / 2)
+      var totalPages = Math.ceil(this.totalEvents / 2);
       return this.page < totalPages;
     }
   }
@@ -80,9 +98,10 @@ export default {
 .pagination {
   display: flex;
   width: 290px;
+  justify-content: space-between;
 }
 .pagination a {
-  flex: 1;
+  /* flex: 1; */
   text-decoration: none;
   color: #2c3e52;
 }
